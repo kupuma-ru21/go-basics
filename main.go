@@ -1,9 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"unsafe"
-)
+import "fmt"
 
 // static checkをmanualで設定した。
 // https://stackoverflow.com/questions/71101439/how-can-i-configure-the-staticcheck-linter-in-visual-studio-code
@@ -12,30 +9,83 @@ import (
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
 func main() {
-	var ui1 uint16
-	fmt.Printf("memory top address of ui1 is %p\n", &ui1)
+	var a1 [3]int
+	var a2 = [3]int{10, 20, 30}
+	a3 := [...]int{10, 20}
+	fmt.Printf("%v %v %v\n", a1, a2, a3)
+	fmt.Printf("%v %v\n", len(a3), cap(a3))
+	fmt.Printf("%T %T\n", a2, a3)
 
-	var ui2 uint16
-	fmt.Printf("memory top address of ui2 is %p\n", &ui2)
+	var s1 []int
+	s2 := []int{}
+	fmt.Printf("s1: %[1]T %[1]v %v %v\n", s1, len(s1), cap(s1))
+	fmt.Printf("s2: %[1]T %[1]v %v %v\n", s2, len(s2), cap(s2))
 
-	var p1 *uint16
-	fmt.Printf("value of p1 is %v\n", p1)
-	p1 = &ui1
-	// value of p1 is equal to memory top address of ui1
-	fmt.Printf("value of p1 is %v\n", p1)
-	fmt.Printf("size of p1 is %d[bytes]\n", unsafe.Sizeof(p1))
-	fmt.Printf("memory top address of p1 is %p\n", &p1)
-	fmt.Printf("value of ui1(dereference) is %v\n", *p1)
-	*p1 = 1
-	fmt.Printf("value of ui1 is %v\n", ui1)
+	fmt.Println(s1 == nil)
+	fmt.Println(s2 == nil)
 
-	var pp1 **uint16 = &p1
-	fmt.Printf("value of pp1 is %v\n", pp1)
-	fmt.Printf("size of pp1 is %d[bytes]\n", unsafe.Sizeof(pp1))
-	fmt.Printf("memory top address of pp1 is %p\n", &pp1)
-	fmt.Printf("value of p1(dereference) is %v\n", *pp1)
-	fmt.Printf("value of ui1(dereference) is %v\n", **pp1)
+	s1 = append(s1, 1, 2, 3)
+	fmt.Printf("s1: %[1]T %[1]v %v %v\n", s1, len(s1), cap(s1))
 
-	**pp1 = 10
-	fmt.Printf("value of ui1 is %v\n", ui1)
+	s3 := []int{4, 5, 6}
+	s1 = append(s1, s3...)
+	fmt.Printf("s1: %[1]T %[1]v %v %v\n", s1, len(s1), cap(s1))
+
+	s4 := make([]int, 0, 2)
+	fmt.Printf("s4: %[1]T %[1]v %v %v\n", s4, len(s4), cap(s4))
+	s4 = append(s4, 1, 2, 3, 4)
+	fmt.Printf("s4: %[1]T %[1]v %v %v\n", s4, len(s4), cap(s4))
+
+	s5 := make([]int, 4, 6)
+	fmt.Printf("s5: %[1]T %[1]v %v %v\n", s5, len(s5), cap(s5))
+
+	s6 := s5[1:3]
+	s6[1] = 10 // NOTE: this make s5[1] 10
+	fmt.Printf("s5: %[1]T %[1]v %v %v\n", s5, len(s5), cap(s5))
+	fmt.Printf("s6: %[1]T %[1]v %v %v\n", s6, len(s6), cap(s6))
+	s6 = append(s6, 2)
+	fmt.Printf("s5: %[1]T %[1]v %v %v\n", s5, len(s5), cap(s5))
+	fmt.Printf("s6: %[1]T %[1]v %v %v\n", s6, len(s6), cap(s6))
+
+	sc6 := make([]int, len(s5[1:3]))
+	fmt.Printf("s5 source of copy: %v %v %v\n", s5, len(s5), cap(s5))
+	fmt.Printf("sc6 dst copy before: %v %v %v\n", sc6, len(sc6), cap(sc6))
+	copy(sc6, s5[1:3])
+	fmt.Printf("sc6 dst copy after: %v %v %v\n", sc6, len(sc6), cap(sc6))
+	sc6[1] = 12
+	fmt.Printf("s5: %v %v %v\n", s5, len(s5), cap(s5))
+	fmt.Printf("sc6: %v %v %v\n", sc6, len(sc6), cap(sc6))
+
+	fs5 := make([]int, 4, 6)
+	fs6 := fs5[1:3:3]
+	fmt.Printf("fs5: %v %v %v\n", fs5, len(fs5), cap(fs5))
+	fmt.Printf("fs6: %v %v %v\n", fs6, len(fs6), cap(fs6))
+	fs6[0] = 6
+	fs6[1] = 7
+	fs6 = append(fs6, 8)
+	fmt.Printf("fs5: %v %v %v\n", fs5, len(fs5), cap(fs5))
+	fmt.Printf("fs6: %v %v %v\n", fs6, len(fs6), cap(fs6))
+	fs5[3] = 9
+	fmt.Printf("fs5: %v %v %v\n", fs5, len(fs5), cap(fs5))
+	fmt.Printf("fs6: %v %v %v\n", fs6, len(fs6), cap(fs6))
+
+	var m1 map[string]int
+	m2 := map[string]int{}
+	fmt.Printf("m1: %v %v\n", m1, m1 == nil)
+	fmt.Printf("m2: %v %v\n", m2, m2 == nil)
+	m2["A"] = 10
+	m2["B"] = 20
+	m2["C"] = 0
+	fmt.Printf("m2: %v %v %v\n", m2, len(m2), m2["A"])
+	delete(m2, "A")
+	fmt.Printf("m2: %v %v %v\n", m2, len(m2), m2["A"])
+
+	v1, ok1 := m2["A"]
+	fmt.Printf("%v %v\n", v1, ok1)
+	v2, ok2 := m2["C"]
+	fmt.Printf("%v %v\n", v2, ok2)
+
+	for key, value := range m2 {
+		fmt.Printf("%v %v\n", key, value)
+	}
 }
