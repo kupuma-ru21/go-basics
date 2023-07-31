@@ -1,8 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"time"
+	"os"
 )
 
 // static checkをmanualで設定した。
@@ -11,53 +12,49 @@ import (
 // vscode goのextensionが正常に作動しなかった
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
+var ErrCustom = errors.New("not found")
+
 func main() {
-	a := -1
-	if a == 0 {
-		fmt.Println("zero")
-	} else if a > 0 {
-		fmt.Println("positive")
-	} else {
-		fmt.Println("negative")
+	err01 := errors.New("something wrong")
+	err02 := errors.New("something wrong")
+	fmt.Printf("%[1]p %[1]T %[1]v \n", err01)
+	fmt.Println(err01)
+	fmt.Println(err01 == err02)
+
+	err0 := fmt.Errorf("add info: %w", errors.New("original Error"))
+	fmt.Printf("%[1]p %[1]T %[1]v \n", err0)
+	fmt.Println(errors.Unwrap(err0))
+	fmt.Printf("%T\n", errors.Unwrap(err0))
+
+	err1 := fmt.Errorf("add info: %v", errors.New("original Error"))
+	fmt.Println(err1)
+	fmt.Printf("%T\n", err1)
+	fmt.Println(errors.Unwrap(err1)) // to be nil
+
+	err2 := fmt.Errorf("in repository layer: %w", ErrCustom)
+	fmt.Println(err2)
+	err2 = fmt.Errorf("in service layer: %w", err2)
+	fmt.Println(err2)
+	if errors.Is(err2, ErrCustom) {
+		fmt.Println("matched")
 	}
 
-	for i := 0; i < 5; i++ {
-		fmt.Println(i)
-	}
-
-	var i int
-	for {
-		if i > 3 {
-			break
+	fileName := "dummy.txt"
+	err3 := fileChecker(fileName)
+	if err3 != nil {
+		if errors.Is(err3, os.ErrNotExist) {
+			fmt.Printf("%v file not found \n", fileName)
+		} else {
+			fmt.Println("unknown error")
 		}
-		fmt.Println(i)
-		i += 1
-		time.Sleep(300 * time.Millisecond)
 	}
-
-loop:
-	for i := 0; i < 10; i++ {
-		switch i {
-		case 2:
-			continue
-		case 3:
-			continue
-		case 8:
-			break loop
-		default:
-			fmt.Printf("%v", i)
-		}
-		fmt.Printf("\n")
-	}
-
-	items := []item{{price: 10.}, {price: 20.}, {price: 30.}}
-	for i := range items {
-		items[i].price = items[i].price * 1.1
-	}
-	fmt.Printf("%+v\n", items)
-
 }
 
-type item struct {
-	price float32
+func fileChecker(fileName string) error {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return fmt.Errorf("in checker: %w", err)
+	}
+	defer f.Close()
+	return nil
 }
