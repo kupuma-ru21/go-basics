@@ -1,10 +1,8 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"strings"
+	"unsafe"
 )
 
 // static checkをmanualで設定した。
@@ -13,81 +11,80 @@ import (
 // vscode goのextensionが正常に作動しなかった
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
+type controller interface {
+	speedUp() int
+	speedDown() int
+}
+
+type vehicle struct {
+	speed       int
+	enginePower int
+}
+
+type bicycle struct {
+	speed      int
+	humanPower int
+}
+
 func main() {
-	funcDefer()
+	v := &vehicle{0, 5}
+	speedUpAndDown(v)
 
-	files := []string{"file1.csv", "file2.csv", "file3.csv"}
-	fmt.Println(trimExtension(files...))
+	b := &bicycle{0, 5}
+	speedUpAndDown(b)
 
-	fileName, err := fileChecker("file.txt")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(fileName)
+	fmt.Println(v)
 
-	i := 1
-	func(i int) {
-		fmt.Println(i)
-	}(i)
-
-	f1 := func(i int) int {
-		return i + 1
-	}
-	fmt.Println(f1(1))
-
-	f2 := func(fileName string) string {
-		return fileName + ".csv"
-	}
-	addExtension(f2, "file1")
-
-	f3 := multiply()
-	fmt.Println(f3(2))
-
-	f4 := countUp()
-	// for i := 1; i <= 5; i++ {
-	// 	fmt.Printf("%v\n", f4(2))
-	// }
-	fmt.Printf("%v\n", f4(2))
+	var i1 interface{}
+	var i2 any
+	fmt.Printf("%[1]v %[1]T %v\n", i1, unsafe.Sizeof(i1))
+	fmt.Printf("%[1]v %[1]T %v\n", i2, unsafe.Sizeof(i2))
+	checkType(i2)
+	i2 = 1
+	checkType(i2)
+	i2 = "hello"
+	checkType(i2)
 }
 
-func funcDefer() {
-	defer fmt.Println("main func final finish")
-	defer fmt.Println("main func semi finish")
-	fmt.Println("Hello World")
+func (v *vehicle) speedUp() int {
+	v.speed = v.speed + (10 * v.enginePower)
+	return v.speed
 }
 
-func trimExtension(files ...string) []string {
-	out := make([]string, 0, len(files))
-	for _, file := range files {
-		out = append(out, strings.TrimSuffix(file, ".csv"))
-	}
-	return out
+func (v *vehicle) speedDown() int {
+	v.speed = v.speed - (5 * v.enginePower)
+	return v.speed
 }
 
-func fileChecker(fileName string) (string, error) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		return "", errors.New("file not found")
-	}
-	defer file.Close()
-	return fileName, nil
+func (b *bicycle) speedUp() int {
+	b.speed = b.speed + (3 * b.humanPower)
+	return b.speed
 }
 
-func addExtension(f func(fileNameGiven string) string, fileName string) {
-	fmt.Println(f(fileName))
+func (b *bicycle) speedDown() int {
+	b.speed = b.speed - b.humanPower
+	return b.speed
 }
 
-func multiply() func(int) int {
-	return func(i int) int {
-		return i * 1000
-	}
+func speedUpAndDown(c controller) {
+	fmt.Printf("current speed: %v\n", c.speedUp())
+	fmt.Printf("current speed: %v\n", c.speedDown())
 }
 
-func countUp() func(int) int {
-	count := 0
-	return func(i int) int {
-		count += i
-		return count
+func (v *vehicle) String() string {
+	// NOTE: Sprintfは標準出力でなく、単なるstringとして出力される
+	return fmt.Sprintf("Vehicle current speed is %v (enginePower %v)", v.speed, v.enginePower)
+}
+
+func checkType(i any) {
+	switch i.(type) {
+	case nil:
+		fmt.Println("nil")
+	case int:
+		fmt.Println("int")
+	case string:
+		fmt.Println("string")
+	default:
+		fmt.Println("unknown")
 	}
 }
