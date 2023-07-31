@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"unsafe"
+	"os"
+	"strings"
 )
 
 // static checkをmanualで設定した。
@@ -11,41 +13,81 @@ import (
 // vscode goのextensionが正常に作動しなかった
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
-type Task struct {
-	Title    string
-	Estimate int
-}
-
 func main() {
-	task1 := Task{Title: "Learn Golang", Estimate: 3}
-	task1.Title = "Learning Golang"
-	fmt.Printf("%[1]T, %+[1]v %v \n", task1, task1.Title)
+	funcDefer()
 
-	var task2 = task1
-	task2.Title = "new"
-	fmt.Printf("task1 is %v task2 is %v \n", task1.Title, task2.Title)
+	files := []string{"file1.csv", "file2.csv", "file3.csv"}
+	fmt.Println(trimExtension(files...))
 
-	var task1p = &Task{Title: "Learn concurrency", Estimate: 2}
-	fmt.Printf("task1p: %T %+v %v\n", task1p, *task1p, unsafe.Sizeof(task1p))
-	task1p.Title = "Changed"
-	fmt.Printf("task1p: %+v\n", *task1p)
+	fileName, err := fileChecker("file.txt")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(fileName)
 
-	var task2p *Task = task1p
-	task1p.Title = "Changed by Task2"
-	fmt.Printf("task1p: %+v\n", *task1p)
-	fmt.Printf("task2p: %+v\n", *task2p)
+	i := 1
+	func(i int) {
+		fmt.Println(i)
+	}(i)
 
-	task1.extendEstimate()
-	fmt.Printf("task1 value receiver: %+v\n", task1)
+	f1 := func(i int) int {
+		return i + 1
+	}
+	fmt.Println(f1(1))
 
-	task1.extendEstimatePointer()
-	fmt.Printf("task1 value receiver: %+v\n", task1)
+	f2 := func(fileName string) string {
+		return fileName + ".csv"
+	}
+	addExtension(f2, "file1")
+
+	f3 := multiply()
+	fmt.Println(f3(2))
+
+	f4 := countUp()
+	// for i := 1; i <= 5; i++ {
+	// 	fmt.Printf("%v\n", f4(2))
+	// }
+	fmt.Printf("%v\n", f4(2))
 }
 
-func (task Task) extendEstimate() {
-	task.Estimate += 10
+func funcDefer() {
+	defer fmt.Println("main func final finish")
+	defer fmt.Println("main func semi finish")
+	fmt.Println("Hello World")
 }
 
-func (task *Task) extendEstimatePointer() {
-	task.Estimate += 10
+func trimExtension(files ...string) []string {
+	out := make([]string, 0, len(files))
+	for _, file := range files {
+		out = append(out, strings.TrimSuffix(file, ".csv"))
+	}
+	return out
+}
+
+func fileChecker(fileName string) (string, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return "", errors.New("file not found")
+	}
+	defer file.Close()
+	return fileName, nil
+}
+
+func addExtension(f func(fileNameGiven string) string, fileName string) {
+	fmt.Println(f(fileName))
+}
+
+func multiply() func(int) int {
+	return func(i int) int {
+		return i * 1000
+	}
+}
+
+func countUp() func(int) int {
+	count := 0
+	return func(i int) int {
+		count += i
+		return count
+	}
 }
