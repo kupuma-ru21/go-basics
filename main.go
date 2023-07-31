@@ -1,12 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"go-basics/calculator"
-	"os"
-
-	"github.com/joho/godotenv"
-)
+import "fmt"
 
 // static checkをmanualで設定した。
 // https://stackoverflow.com/questions/71101439/how-can-i-configure-the-staticcheck-linter-in-visual-studio-code
@@ -15,9 +9,11 @@ import (
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
 func main() {
-	godotenv.Load()
-	fmt.Println(os.Getenv("GO_ENV"))
-	fmt.Println(calculator.Offset)
-	fmt.Println(calculator.Sum(1, 2))
-	fmt.Println(calculator.Multiply(1, 2))
+	// var i int = 2
+	// fmt.Println(i)
+	ui := uint16(2)
+	i := 1
+	fmt.Println(i)
+	fmt.Printf("i: %v %T\n", i, i)
+	fmt.Printf("i: %[1]v %[1]T ui: %[2]v %[2]T\n", i, ui)
 }
