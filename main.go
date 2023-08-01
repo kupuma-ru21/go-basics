@@ -1,9 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"os"
+
+	"golang.org/x/exp/constraints"
 )
 
 // static checkをmanualで設定した。
@@ -12,49 +12,41 @@ import (
 // vscode goのextensionが正常に作動しなかった
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
-var ErrCustom = errors.New("not found")
-
 func main() {
-	err01 := errors.New("something wrong")
-	err02 := errors.New("something wrong")
-	fmt.Printf("%[1]p %[1]T %[1]v \n", err01)
-	fmt.Println(err01)
-	fmt.Println(err01 == err02)
+	fmt.Printf("%v\n", add(1, 2))
+	fmt.Printf("%v\n", add(1.1, 2.1))
+	fmt.Printf("%v\n", add("file", ".txt"))
+	var i1, i2 NewInt = 3, 4
+	fmt.Printf("%v\n", add(i1, i2))
+	fmt.Printf("%v\n", min(i1, i2))
 
-	err0 := fmt.Errorf("add info: %w", errors.New("original Error"))
-	fmt.Printf("%[1]p %[1]T %[1]v \n", err0)
-	fmt.Println(errors.Unwrap(err0))
-	fmt.Printf("%T\n", errors.Unwrap(err0))
-
-	err1 := fmt.Errorf("add info: %v", errors.New("original Error"))
-	fmt.Println(err1)
-	fmt.Printf("%T\n", err1)
-	fmt.Println(errors.Unwrap(err1)) // to be nil
-
-	err2 := fmt.Errorf("in repository layer: %w", ErrCustom)
-	fmt.Println(err2)
-	err2 = fmt.Errorf("in service layer: %w", err2)
-	fmt.Println(err2)
-	if errors.Is(err2, ErrCustom) {
-		fmt.Println("matched")
-	}
-
-	fileName := "dummy.txt"
-	err3 := fileChecker(fileName)
-	if err3 != nil {
-		if errors.Is(err3, os.ErrNotExist) {
-			fmt.Printf("%v file not found \n", fileName)
-		} else {
-			fmt.Println("unknown error")
-		}
-	}
+	m1 := map[string]uint{"A": 1, "B": 2, "C": 3}
+	m2 := map[int]float32{1: 1.23, 2: 4.56, 3: 7.89}
+	fmt.Println(sumUp(m1))
+	fmt.Println(sumUp(m2))
 }
 
-func fileChecker(fileName string) error {
-	f, err := os.Open(fileName)
-	if err != nil {
-		return fmt.Errorf("in checker: %w", err)
+type customConstraints interface {
+	~int | uint16 | float32 | float64 | string
+}
+
+type NewInt int
+
+func add[T customConstraints](x, y T) T {
+	return x + y
+}
+
+func min[T constraints.Ordered](x, y T) T {
+	if x < y {
+		return x
 	}
-	defer f.Close()
-	return nil
+	return y
+}
+
+func sumUp[K int | string, V constraints.Float | constraints.Integer](m map[K]V) V {
+	var sum V
+	for _, v := range m {
+		sum = sum + v
+	}
+	return sum
 }
