@@ -1,0 +1,6 @@
+mode: set
+go-basics/main.go:9.14,12.2 0 0
+go-basics/main.go:14.24,16.2 1 1
+go-basics/main.go:18.31,19.12 1 1
+go-basics/main.go:19.12,21.3 1 1
+go-basics/main.go:22.2,22.32 1 1
