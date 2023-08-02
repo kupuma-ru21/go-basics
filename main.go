@@ -1,9 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -13,67 +13,51 @@ import (
 // vscode goのextensionが正常に作動しなかった
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
-const bufSize = 5
-
 func main() {
-	ch1 := make(chan int, bufSize)
-	ch2 := make(chan int, bufSize)
+	// var rwMu sync.RWMutex
+	// var wg sync.WaitGroup
+	// var c int
+	// wg.Add(4)
+	// go write(&rwMu, &wg, &c)
+	// go read(&rwMu, &wg, &c)
+	// go read(&rwMu, &wg, &c)
+	// go read(&rwMu, &wg, &c)
+	// wg.Wait()
+	// println("finish")
+
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Millisecond)
-	defer cancel()
-	wg.Add(3)
-	go countProducer(&wg, ch1, bufSize, 50)
-	go countProducer(&wg, ch2, bufSize, 500)
-	go countConsumer(ctx, &wg, ch1, ch2)
+	var c int64
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				atomic.AddInt64(&c, 1)
+			}
+		}()
+	}
 	wg.Wait()
+	fmt.Println(c)
 	fmt.Println("finish")
 }
 
-func countProducer(wg *sync.WaitGroup, ch chan<- int, size int, sleep int) {
+func read(rwMu *sync.RWMutex, wg *sync.WaitGroup, c *int) {
 	defer wg.Done()
-	defer close(ch)
-	for i := 0; i < size; i++ {
-		time.Sleep(time.Duration(sleep) * time.Millisecond)
-		ch <- i
-	}
+	time.Sleep(10 * time.Millisecond)
+	rwMu.RLock()
+	defer rwMu.RUnlock()
+	fmt.Println("read lock")
+	fmt.Println(*c)
+	time.Sleep(time.Second)
+	fmt.Println("read unlock")
 }
 
-func countConsumer(ctx context.Context, wg *sync.WaitGroup, ch1 <-chan int, ch2 <-chan int) {
+func write(rwMu *sync.RWMutex, wg *sync.WaitGroup, c *int) {
 	defer wg.Done()
-	// loop:
-	for ch1 != nil || ch2 != nil {
-		select {
-		case <-ctx.Done():
-			fmt.Println(ctx.Err())
-			// break loop
-			for ch1 != nil || ch2 != nil {
-				select {
-				case v, ok := <-ch1:
-					if !ok {
-						ch1 = nil
-						break
-					}
-					fmt.Printf("ch1 %v \n", v)
-				case v, ok := <-ch2:
-					if !ok {
-						ch2 = nil
-						break
-					}
-					fmt.Printf("ch2 %v \n", v)
-				}
-			}
-		case v, ok := <-ch1:
-			if !ok {
-				ch1 = nil
-				break
-			}
-			fmt.Printf("ch1 %v \n", v)
-		case v, ok := <-ch2:
-			if !ok {
-				ch2 = nil
-				break
-			}
-			fmt.Printf("ch2 %v \n", v)
-		}
-	}
+	rwMu.Lock()
+	defer rwMu.Unlock()
+	fmt.Println("write lock")
+	*c = *c + 1
+	time.Sleep(time.Second)
+	fmt.Println("write unlock")
 }
