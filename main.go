@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -13,69 +14,38 @@ import (
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
 func main() {
-	// without buffer
-	ch1 := make(chan int)
+	ch1 := make(chan string, 1)
+	ch2 := make(chan string, 1)
 	var wg sync.WaitGroup
-	wg.Add(1)
-
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	defer cancel()
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		fmt.Println(<-ch1)
+		time.Sleep(500 * time.Millisecond)
+		ch1 <- "A"
+	}()
+	go func() {
+		defer wg.Done()
+		time.Sleep(800 * time.Millisecond)
+		ch2 <- "B"
 	}()
 
-	ch1 <- 10
-	close(ch1)
-
-	v1, ok1 := <-ch1
-	fmt.Printf("%v %v\n", v1, ok1)
-	wg.Wait()
-
-	// with buffer
-	ch2 := make(chan int, 2)
-	ch2 <- 1
-	ch2 <- 2
-	close(ch2)
-
-	v2, ok2 := <-ch2
-	fmt.Printf("%v %v\n", v2, ok2)
-
-	v3, ok3 := <-ch2
-	fmt.Printf("%v %v\n", v3, ok3)
-
-	v4, ok4 := <-ch2
-	fmt.Printf("%v %v\n", v4, ok4)
-
-	ch3 := generateCountStream()
-	for v := range ch3 {
-		fmt.Println(v)
-		time.Sleep(2 * time.Second)
+loop:
+	for ch1 != nil || ch2 != nil {
+		select {
+		case <-ctx.Done():
+			fmt.Println("timeout")
+			break loop
+		case v := <-ch1:
+			fmt.Println(v)
+			ch1 = nil
+		case v := <-ch2:
+			fmt.Println(v)
+			ch2 = nil
+		}
 	}
 
-	nCh := make(chan struct{})
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			fmt.Printf("goroutine %v started\n", i)
-			<-nCh
-			fmt.Println(i)
-		}(i)
-	}
-	time.Sleep(2 * time.Second)
-	close(nCh)
-	fmt.Println("unlocked by manual close")
 	wg.Wait()
 	fmt.Println("finish")
-}
-
-func generateCountStream() <-chan int {
-	ch := make(chan int)
-	go func() {
-		defer close(ch)
-		for i := 0; i <= 5; i++ {
-			ch <- i
-			fmt.Println("write")
-		}
-	}()
-	return ch
 }
