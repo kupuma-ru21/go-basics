@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -13,39 +12,27 @@ import (
 // vscode goのextensionが正常に作動しなかった
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
+const bufSize = 3
+
 func main() {
-	ch1 := make(chan string, 1)
-	ch2 := make(chan string, 1)
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
-	defer cancel()
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		time.Sleep(500 * time.Millisecond)
-		ch1 <- "A"
-	}()
-	go func() {
-		defer wg.Done()
-		time.Sleep(800 * time.Millisecond)
-		ch2 <- "B"
-	}()
+	ch := make(chan string, bufSize)
+	wg.Add(1)
 
-loop:
-	for ch1 != nil || ch2 != nil {
-		select {
-		case <-ctx.Done():
-			fmt.Println("timeout")
-			break loop
-		case v := <-ch1:
-			fmt.Println(v)
-			ch1 = nil
-		case v := <-ch2:
-			fmt.Println(v)
-			ch2 = nil
+	go func() {
+		defer wg.Done()
+		for i := 0; i < bufSize; i++ {
+			time.Sleep(1000 * time.Millisecond)
+			ch <- "hello"
 		}
+	}()
+	for i := 0; i < 3; i++ {
+		select {
+		case m := <-ch:
+			fmt.Println(m)
+		default:
+			fmt.Println("no msg arrived")
+		}
+		time.Sleep(1500 * time.Millisecond)
 	}
-
-	wg.Wait()
-	fmt.Println("finish")
 }
