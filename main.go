@@ -3,9 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 // static checkをmanualで設定した。
@@ -15,47 +12,98 @@ import (
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	numbers := []int{1, 2, 3, 4, 5}
+	var i int
+	flag := true
+	// for v := range double(ctx, offset(ctx, double(ctx, generator(ctx, numbers...)))) {
+	// 	if i == 1 {
+	// 		cancel()
+	// 		flag = false
+	// 	}
+	// 	if flag {
+	// 		fmt.Println(v)
+	// 	}
+	// 	i++
+	// }
 
-	eg, ctx := errgroup.WithContext(ctx)
-	s := []string{"task1", "task2", "task3", "task4"}
-	for _, v := range s {
-		task := v
-		eg.Go(func() error { return doTask(ctx, task) })
-	}
-	if err := eg.Wait(); err != nil {
-		fmt.Printf("error %v \n", err)
+	// for v := range generator(ctx, numbers...) {
+	// 	if i == 1 {
+	// 		cancel()
+	// 		flag = false
+	// 	}
+	// 	if flag {
+	// 		fmt.Println(v)
+	// 	}
+	// 	i++
+	// }
+
+	// for v := range double(ctx, generator(ctx, numbers...)) {
+	// 	if i == 1 {
+	// 		cancel()
+	// 		flag = false
+	// 	}
+	// 	if flag {
+	// 		fmt.Println(v)
+	// 	}
+	// 	i++
+	// }
+
+	for v := range offset(ctx, double(ctx, generator(ctx, numbers...))) {
+		if i == 1 {
+			cancel()
+			flag = false
+		}
+		if flag {
+			fmt.Println(v)
+		}
+		i++
 	}
 	fmt.Println("finish")
 }
 
-func doTask(ctx context.Context, task string) error {
-	var t *time.Ticker
-	switch task {
-	case "task1":
-		t = time.NewTicker(500 * time.Millisecond)
-	case "task2":
-		t = time.NewTicker(700 * time.Millisecond)
-	default:
-		t = time.NewTicker(1000 * time.Millisecond)
-
-	}
-	select {
-	case <-ctx.Done():
-		fmt.Printf("%v canceled : %v\n", task, ctx.Err())
-		return ctx.Err()
-	case <-t.C:
-		t.Stop()
-		fmt.Printf("task %v completed\n", task)
-	}
-	return nil
+func generator(ctx context.Context, numbers ...int) <-chan int {
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for _, num := range numbers {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- num:
+			}
+		}
+	}()
+	return out
 }
 
-// func oldDoTask(ctx context.Context, task string) error {
-// 	if task == "fake1" || task == "fake2" {
-// 		return fmt.Errorf("%v failed", task)
-// 	}
-// 	fmt.Printf("task %v completed\n", task)
-// 	return nil
-// }
+func double(ctx context.Context, in <-chan int) <-chan int {
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for n := range in {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n * 2:
+			}
+		}
+	}()
+	return out
+}
+
+func offset(ctx context.Context, in <-chan int) <-chan int {
+	out := make(chan int)
+	go func() {
+		defer close(out)
+		for n := range in {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n + 2:
+			}
+		}
+	}()
+	return out
+}
