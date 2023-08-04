@@ -23,7 +23,7 @@ func main() {
 	}
 	defer file.Close()
 	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "ERROR: ", log.LstdFlags)
-	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1100*time.Millisecond)
 	defer cancel()
 	const wdtTimeout = 800 * time.Millisecond
 	const beatInterval = 500 * time.Millisecond
@@ -58,7 +58,6 @@ func task(ctx context.Context, beatInterval time.Duration) (<-chan struct{}, <-c
 		pulse := time.NewTicker(beatInterval)
 		task := time.NewTicker(beatInterval * 2)
 		sendPulse := func() {
-			fmt.Println("sendPulse")
 			select {
 			case heartBeat <- struct{}{}:
 			default:
@@ -80,10 +79,8 @@ func task(ctx context.Context, beatInterval time.Duration) (<-chan struct{}, <-c
 			select {
 			case <-ctx.Done():
 				return
-			case value := <-pulse.C:
-				fmt.Println("test")
+			case <-pulse.C:
 				sendPulse()
-				fmt.Println("value", value)
 			case t := <-task.C:
 				sendValue(t)
 			}
