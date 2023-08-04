@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"runtime"
-	"sync"
+	"io"
+	"log"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -15,85 +17,77 @@ import (
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
 func main() {
-	cores := runtime.NumCPU()
-	ctx, cancel := context.WithCancel(context.Background())
+	file, err := os.Create("log.txt")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer file.Close()
+	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "ERROR: ", log.LstdFlags)
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
 	defer cancel()
-	numbers := []int{1, 2, 3, 4, 5, 6, 7, 8}
-
-	outChs := make([]<-chan string, cores)
-	inData := generator(ctx, numbers...)
-	for i := 0; i < cores; i++ {
-		outChs[i] = fanOut(ctx, inData, i+1)
-	}
-	var i int
-	flag := true
-	for v := range fanIn(ctx, outChs...) {
-		if i == 3 {
-			cancel()
-			flag = false
+	const wdtTimeout = 800 * time.Millisecond
+	const beatInterval = 500 * time.Millisecond
+	heartBeat, v := task(ctx, beatInterval)
+loop:
+	for {
+		select {
+		case _, ok := <-heartBeat:
+			if !ok {
+				break loop
+			}
+			fmt.Println("beat pulse ⚡︎")
+		case r, ok := <-v:
+			if !ok {
+				break loop
+			}
+			t := strings.Split(r.String(), "m=")
+			fmt.Printf("value: %v [s]\n", t[1])
+		case <-time.After(wdtTimeout):
+			errorLogger.Println("doTask goroutine's heartBeat stooped")
+			break loop
 		}
-		if flag {
-			fmt.Println(v)
-		}
-		i++
 	}
-	fmt.Println("finish")
 }
 
-func generator(ctx context.Context, numbers ...int) <-chan int {
-	out := make(chan int)
+func task(ctx context.Context, beatInterval time.Duration) (<-chan struct{}, <-chan time.Time) {
+	heartBeat := make(chan struct{})
+	out := make(chan time.Time)
 	go func() {
+		defer close(heartBeat)
 		defer close(out)
-		for _, num := range numbers {
+		pulse := time.NewTicker(beatInterval)
+		task := time.NewTicker(beatInterval * 2)
+		sendPulse := func() {
+			fmt.Println("sendPulse")
+			select {
+			case heartBeat <- struct{}{}:
+			default:
+			}
+		}
+		sendValue := func(t time.Time) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-pulse.C:
+					sendPulse()
+				case out <- t:
+					return
+				}
+			}
+		}
+		for {
 			select {
 			case <-ctx.Done():
 				return
-			case out <- num:
+			case value := <-pulse.C:
+				fmt.Println("test")
+				sendPulse()
+				fmt.Println("value", value)
+			case t := <-task.C:
+				sendValue(t)
 			}
 		}
 	}()
-	return out
-}
-
-func fanOut(ctx context.Context, in <-chan int, id int) <-chan string {
-	out := make(chan string)
-	go func() {
-		defer close(out)
-		heavyFunc := func(i int, id int) string {
-			time.Sleep(200 * time.Millisecond)
-			return fmt.Sprintf("result:%v (id: %v)", i*i, id)
-		}
-		for v := range in {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- heavyFunc(v, id):
-			}
-		}
-	}()
-	return out
-}
-
-func fanIn(ctx context.Context, chs ...<-chan string) <-chan string {
-	var wg sync.WaitGroup
-	out := make(chan string)
-	multiplex := func(ch <-chan string) {
-		defer wg.Done()
-		for text := range ch {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- text:
-			}
-		}
-	}
-	wg.Add(len(chs))
-	for _, ch := range chs {
-		go multiplex(ch)
-	}
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
+	return heartBeat, out
 }
