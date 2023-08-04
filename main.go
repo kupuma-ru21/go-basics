@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"sync"
+	"time"
 )
 
 // static checkをmanualで設定した。
@@ -12,46 +15,20 @@ import (
 // https://formulae.brew.sh/formula/goplsをinstallする必要があった
 
 func main() {
+	cores := runtime.NumCPU()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	numbers := []int{1, 2, 3, 4, 5}
+	numbers := []int{1, 2, 3, 4, 5, 6, 7, 8}
+
+	outChs := make([]<-chan string, cores)
+	inData := generator(ctx, numbers...)
+	for i := 0; i < cores; i++ {
+		outChs[i] = fanOut(ctx, inData, i+1)
+	}
 	var i int
 	flag := true
-	// for v := range double(ctx, offset(ctx, double(ctx, generator(ctx, numbers...)))) {
-	// 	if i == 1 {
-	// 		cancel()
-	// 		flag = false
-	// 	}
-	// 	if flag {
-	// 		fmt.Println(v)
-	// 	}
-	// 	i++
-	// }
-
-	// for v := range generator(ctx, numbers...) {
-	// 	if i == 1 {
-	// 		cancel()
-	// 		flag = false
-	// 	}
-	// 	if flag {
-	// 		fmt.Println(v)
-	// 	}
-	// 	i++
-	// }
-
-	// for v := range double(ctx, generator(ctx, numbers...)) {
-	// 	if i == 1 {
-	// 		cancel()
-	// 		flag = false
-	// 	}
-	// 	if flag {
-	// 		fmt.Println(v)
-	// 	}
-	// 	i++
-	// }
-
-	for v := range offset(ctx, double(ctx, generator(ctx, numbers...))) {
-		if i == 1 {
+	for v := range fanIn(ctx, outChs...) {
+		if i == 3 {
 			cancel()
 			flag = false
 		}
@@ -78,32 +55,45 @@ func generator(ctx context.Context, numbers ...int) <-chan int {
 	return out
 }
 
-func double(ctx context.Context, in <-chan int) <-chan int {
-	out := make(chan int)
+func fanOut(ctx context.Context, in <-chan int, id int) <-chan string {
+	out := make(chan string)
 	go func() {
 		defer close(out)
-		for n := range in {
+		heavyFunc := func(i int, id int) string {
+			time.Sleep(200 * time.Millisecond)
+			return fmt.Sprintf("result:%v (id: %v)", i*i, id)
+		}
+		for v := range in {
 			select {
 			case <-ctx.Done():
 				return
-			case out <- n * 2:
+			case out <- heavyFunc(v, id):
 			}
 		}
 	}()
 	return out
 }
 
-func offset(ctx context.Context, in <-chan int) <-chan int {
-	out := make(chan int)
-	go func() {
-		defer close(out)
-		for n := range in {
+func fanIn(ctx context.Context, chs ...<-chan string) <-chan string {
+	var wg sync.WaitGroup
+	out := make(chan string)
+	multiplex := func(ch <-chan string) {
+		defer wg.Done()
+		for text := range ch {
 			select {
 			case <-ctx.Done():
 				return
-			case out <- n + 2:
+			case out <- text:
 			}
 		}
+	}
+	wg.Add(len(chs))
+	for _, ch := range chs {
+		go multiplex(ch)
+	}
+	go func() {
+		wg.Wait()
+		close(out)
 	}()
 	return out
 }
